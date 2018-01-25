@@ -55,18 +55,18 @@ Thirdly, init the pool
 	
 Now, you can use like this
 
-  ```
+```
   	conn,err := pool.Get()
 	if(err == TimeoutError){
 		fmt.Println("timeout")
 		return
 	}
 	pool.Put(conn)
-    ```
+ ```
  At last, please remember to close the pool
  
   ```
    pool.Close()
-    ```
+  ```
     
     
