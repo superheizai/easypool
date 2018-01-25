@@ -9,7 +9,9 @@ easypool is a connection pool in Go, which referenced the implementation of http
 ## Core features:
  * with core connections, but initial size is 0, will be increased by Get,and will not increse to core if the frequence is not
 high
+
  * has status change 
+ 
    1.init status is busy with true ,which means the pool will not destory the connection when put the connection back to pool  
    2.when the get opeartion is less than PoolConfig.Threadhold for PoolConfig.ThreadholdTimes, the status will change busy to false  
    3.when status is false, when the get opeartion is more than PoolConfig.Threadhold for PoolConfig.ThreadholdTimes, the status will change busy to true  
@@ -49,7 +51,7 @@ Thirdly, init the pool
 
 ```
 	pool := InitEasyPool(config)
-	```
+```
 	
 Now, you can use like this
 
