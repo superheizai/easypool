@@ -49,7 +49,8 @@ Thirdly, init the pool
 
 ```
 	pool := InitEasyPool(config)
-`
+	```
+	
 Now, you can use like this
 
   ```
