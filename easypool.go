@@ -14,16 +14,16 @@ var (
 
 type EasyPool struct {
 	config      PoolConfig
-	Coons       chan Closable // 连接池
-	Mux         sync.RWMutex  //锁
+	Coons       chan Closable // channel for connections
+	Mux         sync.RWMutex
 	Closed      bool
 	closingChan chan interface{}
-	current     int        // 当前分配出的连接数量，包括conns里面的和在使用未归还的
-	busy        bool       // current status, 记录当前操作频繁与否;true时候，put操作直接入队；false时候，先看是否小于core，再入队，大于core，直接回收了
-	times       chan int64 // times channel,每个get请求会把自己的请求时间放到channel里面，统计每个时间点的请求信息
-	marktime    int64      //此时在统计的标记时间点,秒级时间，time.unix()返回
-	markCount   int        // markTime时间点上，被mark的次数
-	markTimes   int        // 现在已经因为超过或者低于阈值，而累积的次数。当超过durationtimes，会触发busy值的改变
+	current     int        // connections count currently in the pool
+	busy        bool       // current status.true, put back can be putinto the pool directly. false, put will check if connection count is greater than core.yes, will discard the connection
+	times       chan int64 // times channel, summary the time of every Get, to calculate Get() for every second
+	marktime    int64      //current time,time.Unix()
+	markCount   int        // Get() executed times at markTime
+	markTimes   int        // continuous times over the threadhold or behind the threadhold
 }
 
 func InitEasyPool(config PoolConfig) *EasyPool {
@@ -50,7 +50,7 @@ func (easyPool *EasyPool) switchStatus() {
 			cur := <-easyPool.times
 			if easyPool.marktime == cur {
 				easyPool.markCount++
-				//在空闲时候，如果操作次数大于2倍阈值的时候，会直接转为忙状态，不会等待这一秒的统计周期结束
+				// when busy is false and  markCount increases quickly, when markCount is greater than 2 times of threadhold, busy will change to true, will not wait the trigger condition of threadhold and threadholdTimes
 				if (!easyPool.busy && easyPool.markCount > 2*easyPool.config.Threadhold) {
 					easyPool.busy = true
 				}
@@ -58,7 +58,7 @@ func (easyPool *EasyPool) switchStatus() {
 				easyPool.marktime = cur
 				lastMarkCount := easyPool.markCount
 				easyPool.markCount = 1
-				//新的时间窗到来，根据之前是忙还是空，来判断状态
+				// a new second comes, marktime updated. need to check if fulfill the condition of threadhold and threadholdTimes to trigger busy change
 				if (easyPool.busy) {
 					if (lastMarkCount < easyPool.config.Threadhold) {
 						easyPool.markTimes++
@@ -67,7 +67,6 @@ func (easyPool *EasyPool) switchStatus() {
 							easyPool.markTimes = 0;
 						}
 					} else {
-						//新的时间窗到来，但是其阈值没有超过设定阈值
 						easyPool.markTimes = 0
 					}
 				} else {
@@ -79,7 +78,6 @@ func (easyPool *EasyPool) switchStatus() {
 							easyPool.markTimes = 0;
 						}
 					} else {
-						//新的时间窗到来，但是其阈值没有超过设定阈值
 						easyPool.markTimes = 0
 					}
 				}
