@@ -17,7 +17,7 @@ type EasyPool struct {
 	Coons       chan Closable // channel for connections
 	Mux         sync.RWMutex
 	Closed      bool
-	closingChan chan interface{}
+	closingChan chan struct{}
 	current     int        // connections count currently in the pool
 	busy        bool       // current status.true, put back can be putinto the pool directly. false, put will check if connection count is greater than core.yes, will discard the connection
 	times       chan int64 // times channel, summary the time of every Get, to calculate Get() for every second
@@ -32,7 +32,7 @@ func InitEasyPool(config PoolConfig) *EasyPool {
 	easyPool.busy = true
 	easyPool.Coons = make(chan Closable, config.Max)
 	easyPool.Closed = false
-	easyPool.closingChan = make(chan interface{}, 1)
+	easyPool.closingChan = make(chan struct{}, 1)
 	easyPool.busy = true
 	easyPool.times = make(chan int64, 1000)
 	easyPool.marktime = time.Now().Unix()
@@ -158,7 +158,7 @@ func (easyPool *EasyPool) Get() (Closable, error) {
 					defer easyPool.Mux.RUnlock()
 					easyPool.current--
 					if easyPool.current >= 0 {
-						easyPool.closingChan <- ""
+						easyPool.closingChan <- struct{}{}
 					}
 					return nil, OperationAtClosedPoolError
 				}
@@ -173,7 +173,7 @@ func (easyPool *EasyPool) Close() {
 		return
 	}
 	easyPool.Mux.Lock()
-	easyPool.closingChan <- ""
+	easyPool.closingChan <- struct{}{}
 	close(easyPool.Coons)
 	defer easyPool.Mux.Unlock()
 	easyPool.Closed = true
